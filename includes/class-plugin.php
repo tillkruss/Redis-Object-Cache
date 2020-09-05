@@ -44,6 +44,13 @@ class Plugin {
     ];
 
     /**
+     * Path to the settings file
+     *
+     * @var string
+     */
+    private $settings_path = '';
+
+    /**
      * Plugin instance property
      *
      * @var Plugin
@@ -79,6 +86,8 @@ class Plugin {
             $this->page = 'options-general.php?page=redis-cache';
             $this->screen = 'settings_page_redis-cache';
         }
+
+        $this->settings_path = WP_CONTENT_DIR . '/redis_object_cache/settings.php';
 
         $this->add_actions_and_filters();
 
@@ -121,6 +130,9 @@ class Plugin {
 
         add_filter( 'qm/collectors', [ $this, 'register_qm_collector' ], 25 );
         add_filter( 'qm/outputter/html', [ $this, 'register_qm_output' ] );
+
+        add_action( 'redis_object_cache_enable', [ $this, 'create_settings' ] );
+        add_action( 'redis_object_cache_update_dropin', [ $this, 'create_settings' ] );
     }
 
     /**
@@ -623,6 +635,7 @@ class Plugin {
                 if ( $this->initialize_filesystem( $url, true ) ) {
 
                     if ( $action === 'enable-cache' ) {
+                        $this->create_settings();
                         $result = $wp_filesystem->copy(
                             WP_REDIS_PLUGIN_PATH . '/includes/object-cache.php',
                             WP_CONTENT_DIR . '/object-cache.php',
@@ -654,6 +667,7 @@ class Plugin {
                     }
 
                     if ( $action === 'disable-cache' ) {
+                        $wp_filesystem->delete( $this->settings_path );
                         $result = $wp_filesystem->delete( WP_CONTENT_DIR . '/object-cache.php' );
 
                         /**
@@ -680,6 +694,7 @@ class Plugin {
                     }
 
                     if ( $action === 'update-dropin' ) {
+                        $this->create_settings();
                         $result = $wp_filesystem->copy(
                             WP_REDIS_PLUGIN_PATH . '/includes/object-cache.php',
                             WP_CONTENT_DIR . '/object-cache.php',
@@ -723,6 +738,41 @@ class Plugin {
                 }
             }
         }
+    }
+
+    /**
+     * Creates the `settings.php` file in our custom WP_CONTENT_DIR directory.
+     *
+     * @return bool
+     */
+    public function create_settings() {
+        global $wp_filesystem;
+
+        if ( ! $this->initialize_filesystem( '', true ) ) {
+            return false;
+        }
+
+        wp_mkdir_p( dirname( $this->settings_path ) );
+
+        $content = $wp_filesystem->get_contents( WP_REDIS_PLUGIN_PATH . '/includes/settings-template.php' );
+
+        $constants = [
+            'WP_REDIS_SETUP_DONE' => time(),
+            'WP_REDIS_PLUGIN_PATH' => WP_REDIS_PLUGIN_PATH,
+        ];
+
+        $template = 'defined( \'%1$s\' ) || define( \'%1$s\', %2$s );';
+        $additonal_content = [];
+        foreach ( $constants as $name => $value ) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_var_export
+            $additonal_content[] = sprintf( $template, $name, var_export( $value, true ) );
+        }
+
+        return $wp_filesystem->put_contents(
+            $this->settings_path,
+            $content . "\n" . implode( "\n", $additonal_content ) . "\n\n",
+            FS_CHMOD_FILE
+        );
     }
 
     /**
