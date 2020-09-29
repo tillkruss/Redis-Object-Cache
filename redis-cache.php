@@ -38,15 +38,4 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
     WP_CLI::add_command( 'redis', Rhubarb\RedisCache\CLI\Commands::class );
 }
 
-Rhubarb\RedisCache\Plugin::instance();
-
-if ( ! function_exists( 'redis_object_cache' ) ) {
-    /**
-     * Returns the plugin instance.
-     *
-     * @return Rhubarb\RedisCache\Plugin
-     */
-    function redis_object_cache() {
-        return Rhubarb\RedisCache\Plugin::instance();
-    }
-}
+add_action( 'plugins_loaded', [ Rhubarb\RedisCache\Plugin::class, 'init' ] );

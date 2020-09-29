@@ -162,8 +162,6 @@ class Tab {
      * @return void
      */
     public function display() {
-        $roc = Plugin::instance();
-
         include $this->file;
     }
 

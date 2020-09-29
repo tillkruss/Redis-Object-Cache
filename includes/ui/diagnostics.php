@@ -5,18 +5,20 @@
  * @package Rhubarb\RedisCache
  */
 
+use Rhubarb\RedisCache\Plugin;
+
 defined( '\\ABSPATH' ) || exit;
 
 global $wp_object_cache;
 
 $info = [];
-$filesystem = $roc->test_filesystem_writing();
-$dropin = $roc->validate_object_cache_dropin();
+$filesystem = Plugin::test_filesystem_writing();
+$dropin = Plugin::validate_object_cache_dropin();
 $disabled = defined( 'WP_REDIS_DISABLED' ) && WP_REDIS_DISABLED;
 
-$info['Status'] = $roc->get_status();
-$info['Client'] = $roc->get_redis_client_name();
-$info['Drop-in'] = $roc->object_cache_dropin_exists()
+$info['Status'] = Plugin::get_status();
+$info['Client'] = Plugin::get_redis_client_name();
+$info['Drop-in'] = Plugin::object_cache_dropin_exists()
     ? ( $dropin ? 'Valid' : 'Invalid' )
     : 'Not installed';
 $info['Disabled'] = $disabled ? 'Yes' : 'No';
@@ -52,7 +54,7 @@ if ( defined( 'HHVM_VERSION' ) ) {
 }
 
 $info['Plugin Version'] = WP_REDIS_VERSION;
-$info['Redis Version'] = $roc->get_redis_version() ?: 'Unknown';
+$info['Redis Version'] = Plugin::get_redis_version() ?: 'Unknown';
 
 $info['Multisite'] = is_multisite() ? 'Yes' : 'No';
 
