@@ -7,6 +7,8 @@
 
 defined( '\\ABSPATH' ) || exit;
 
+use Rhubarb\RedisCache\Status;
+
 $redis_client = $roc->get_redis_client_name();
 $redis_prefix = $roc->get_redis_prefix();
 $redis_maxttl = $roc->get_redis_maxttl();
@@ -35,13 +37,15 @@ $diagnostics = $roc->get_diagnostics();
         <th><?php esc_html_e( 'Drop-in:', 'redis-cache' ); ?></th>
         <td>
             <code>
-                <?php if ( ! $roc->object_cache_dropin_exists() ) : ?>
+                <?php if ( ! Status::is_dropin_detected() ) : ?>
                     <?php esc_html_e( 'Not installed', 'redis-cache' ); ?>
-                <?php elseif ( $roc->object_cache_dropin_outdated() ) : ?>
+                <?php elseif ( ! Status::is_dropin_readable() ) : ?>
+                    <?php esc_html_e( 'Unreadable', 'redis-cache' ); ?>
+                <?php elseif ( ! Status::is_dropin_up_to_date() ) : ?>
                     <?php esc_html_e( 'Outdated', 'redis-cache' ); ?>
                 <?php else : ?>
                     <?php
-                        $roc->validate_object_cache_dropin()
+                        Status::is_dropin_valid()
                             ? esc_html_e( 'Valid', 'redis-cache' )
                             : esc_html_e( 'Invalid', 'redis-cache' );
                     ?>
@@ -240,7 +244,7 @@ $diagnostics = $roc->get_diagnostics();
         </a> &nbsp;
     <?php endif; ?>
 
-    <?php if ( $roc->validate_object_cache_dropin() ) : ?>
+    <?php if ( Status::is_dropin_valid() ) : ?>
         <a href="<?php echo esc_attr( $roc->action_link( 'disable-cache' ) ); ?>" class="button button-secondary button-large">
             <?php esc_html_e( 'Disable Object Cache', 'redis-cache' ); ?>
         </a>

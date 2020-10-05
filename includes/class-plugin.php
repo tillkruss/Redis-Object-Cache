@@ -383,46 +383,37 @@ class Plugin {
     /**
      * Checks if the `object-cache.php` drop-in exists
      *
+     * @deprecated
      * @return bool
      */
     public function object_cache_dropin_exists() {
-        return file_exists( WP_CONTENT_DIR . '/object-cache.php' );
+        self::deprecated_function( __METHOD__, '2.1.0', Status::class . '::is_dropin_readable' );
+
+        return Status::is_dropin_readable();
     }
 
     /**
      * Validates the `object-cache.php` drop-in
      *
+     * @deprecated
      * @return bool
      */
     public function validate_object_cache_dropin() {
-        if ( ! $this->object_cache_dropin_exists() ) {
-            return false;
-        }
+        self::deprecated_function( __METHOD__, '2.1.0', Status::class . '::is_dropin_valid' );
 
-        $dropin = get_plugin_data( WP_CONTENT_DIR . '/object-cache.php' );
-        $plugin = get_plugin_data( WP_REDIS_PLUGIN_PATH . '/includes/object-cache.php' );
-
-        return $dropin['PluginURI'] === $plugin['PluginURI'];
+        return Status::is_dropin_valid();
     }
 
     /**
      * Checks if the `object-cache.php` drop-in is outdated
      *
+     * @deprecated
      * @return bool
      */
     public function object_cache_dropin_outdated() {
-        if ( ! $this->object_cache_dropin_exists() ) {
-            return false;
-        }
+        self::deprecated_function( __METHOD__, '2.1.0', Status::class . '::is_dropin_up_to_date' );
 
-        $dropin = get_plugin_data( WP_CONTENT_DIR . '/object-cache.php' );
-        $plugin = get_plugin_data( WP_REDIS_PLUGIN_PATH . '/includes/object-cache.php' );
-
-        if ( $dropin['PluginURI'] === $plugin['PluginURI'] ) {
-            return version_compare( $dropin['Version'], $plugin['Version'], '<' );
-        }
-
-        return false;
+        return ! Status::is_dropin_up_to_date();
     }
 
     /**
@@ -433,22 +424,28 @@ class Plugin {
     public function get_status() {
         global $wp_object_cache;
 
-        if ( defined( 'WP_REDIS_DISABLED' ) && WP_REDIS_DISABLED ) {
-            return __( 'Disabled', 'redis-cache' );
+        if ( ! Status::is_enabled() ) {
+            return Status::translate( Status::ENABLED, false );
         }
 
-        if ( ! $this->object_cache_dropin_exists() ) {
-            return __( 'Drop-in not installed', 'redis-cache' );
+        if ( ! Status::is_dropin_detected() ) {
+            return Status::translate( Status::DROPIN_DETECTED, false );
         }
 
-        if ( ! $this->validate_object_cache_dropin() ) {
-            return __( 'Drop-in is invalid', 'redis-cache' );
+        if ( ! Status::is_dropin_readable() ) {
+            return Status::translate( Status::DROPIN_READABLE, false );
+        }
+
+        if ( ! Status::is_dropin_installed() ) {
+            return Status::translate( Status::DROPIN_INSTALLED, false );
+        }
+
+        if ( ! Status::is_dropin_valid() ) {
+            return Status::translate( Status::DRPOIN_VALID, false );
         }
 
         if ( method_exists( $wp_object_cache, 'redis_status' ) ) {
-            return $wp_object_cache->redis_status()
-                ? __( 'Connected', 'redis-cache' )
-                : __( 'Not connected', 'redis-cache' );
+            return Status::translate( Status::CONNECTED, $wp_object_cache->redis_status() );
         }
 
         return __( 'Unknown', 'redis-cache' );
@@ -466,7 +463,7 @@ class Plugin {
             return;
         }
 
-        if ( ! $this->validate_object_cache_dropin() ) {
+        if ( ! Status::is_dropin_valid() ) {
             return;
         }
 
@@ -490,7 +487,7 @@ class Plugin {
             return;
         }
 
-        if ( $this->validate_object_cache_dropin() && method_exists( $wp_object_cache, 'redis_version' ) ) {
+        if ( Status::is_dropin_valid() && method_exists( $wp_object_cache, 'redis_version' ) ) {
             return $wp_object_cache->redis_version();
         }
     }
@@ -520,7 +517,7 @@ class Plugin {
     public function get_diagnostics() {
         global $wp_object_cache;
 
-        if ( $this->validate_object_cache_dropin() && property_exists( $wp_object_cache, 'diagnostics' ) ) {
+        if ( Status::is_dropin_valid() && property_exists( $wp_object_cache, 'diagnostics' ) ) {
             return $wp_object_cache->diagnostics;
         }
     }
@@ -559,11 +556,11 @@ class Plugin {
             return;
         }
 
-        if ( $this->object_cache_dropin_exists() ) {
+        if ( Status::is_dropin_readable() ) {
             $url = $this->action_link( 'update-dropin' );
 
-            if ( $this->validate_object_cache_dropin() ) {
-                if ( $this->object_cache_dropin_outdated() ) {
+            if ( Status::is_dropin_valid() ) {
+                if ( ! Status::is_dropin_up_to_date() ) {
                     // translators: %s = Action link to update the drop-in.
                     $message = sprintf( __( 'The Redis object cache drop-in is outdated. Please <a href="%s">update the drop-in</a>.', 'redis-cache' ), $url );
                 }
@@ -981,7 +978,7 @@ class Plugin {
             return;
         }
 
-        if ( $this->object_cache_dropin_outdated() ) {
+        if ( ! Status::is_dropin_up_to_date() ) {
             add_action( 'shutdown', [ $this, 'update_dropin' ] );
         }
     }
@@ -994,7 +991,7 @@ class Plugin {
     public function update_dropin() {
         global $wp_filesystem;
 
-        if ( ! $this->validate_object_cache_dropin() ) {
+        if ( ! Status::is_dropin_valid() ) {
             return;
         }
 
@@ -1036,7 +1033,7 @@ class Plugin {
 
             wp_cache_flush();
 
-            if ( $this->validate_object_cache_dropin() && $this->initialize_filesystem( '', true ) ) {
+            if ( Status::is_dropin_valid() && $this->initialize_filesystem( '', true ) ) {
                 $wp_filesystem->delete( WP_CONTENT_DIR . '/object-cache.php' );
             }
         }
@@ -1059,5 +1056,39 @@ class Plugin {
             network_admin_url( add_query_arg( 'action', $action, $this->page ) ),
             $action
         );
+    }
+
+    /**
+     * Method to determine if the current request is a REST api request
+     *
+     * @return bool
+     */
+    public static function is_rest_api_request() {
+        if ( empty( $_SERVER['REQUEST_URI'] ) ) {
+            return false;
+        }
+
+        $rest_prefix = trailingslashit( rest_get_url_prefix() );
+        return false !== strpos( $_SERVER['REQUEST_URI'], $rest_prefix ); // phpcs:disable WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+    }
+
+    /**
+     * Wrapper for deprecated functions so we can apply some extra logic.
+     *
+     * @param string $function    Function used.
+     * @param string $version     Version the message was added in.
+     * @param string $replacement Replacement for the called function.
+     */
+    public static function deprecated_function( $function, $version, $replacement = null ) {
+        // phpcs:disable
+        if ( is_ajax() || self::is_rest_api_request() ) {
+            do_action( 'deprecated_function_run', $function, $replacement, $version );
+            $log_string  = "The {$function} function is deprecated since version {$version}.";
+            $log_string .= $replacement ? " Replace with {$replacement}." : '';
+            error_log( $log_string );
+        } else {
+            _deprecated_function( $function, $version, $replacement );
+        }
+        // phpcs:enable
     }
 }
