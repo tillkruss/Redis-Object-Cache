@@ -79,6 +79,7 @@ class Plugin {
         }
 
         Metrics::init();
+        REST_API::init();
 
         $this->add_actions_and_filters();
     }
